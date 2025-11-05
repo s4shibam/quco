@@ -1,0 +1,28 @@
+{
+  // Set Biome as the default formatter
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnSave": true
+  },
+  // Enable format on save globally
+  "editor.formatOnSave": true,
+  // Enable Biome as the default formatter globally
+  "editor.defaultFormatter": "biomejs.biome",
+  // Enable Biome's code actions on save (auto-fix)
+  "editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "explicit"
+  },
+  "cSpell.words": ["esac", "quco", "TLLM"]
+}
