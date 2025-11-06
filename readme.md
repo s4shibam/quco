@@ -87,13 +87,12 @@ quco "download youtube video https://youtu.be/AbCd"
 
 | Command | Description |
 |---------|-------------|
-| `quco --setup` | Interactive setup and configuration. Stores credentials in your shell rc file (.zshrc or .bashrc). |
-| `quco <prompt>` | Generate a shell command from natural language. The command is printed to stdout and copied to clipboard using pbcopy. |
-| `quco --help` | Show help information and usage examples. |
-| `quco --version` | Display version information. |
-| `quco --config` | Show current configuration (model, provider, settings). |
-| `quco --autofill-on` | Enable autofill for zsh or bash. This loads generated commands directly into your shell's edit buffer for review before execution. |
-| `quco --autofill-off` | Disable autofill and remove the shell function from your configuration. |
+| `--setup` | Interactive setup and configuration. Stores credentials in your shell rc file (.zshrc or .bashrc). |
+| `<prompt>` | Generate a shell command from natural language. The command is printed to stdout and copied to clipboard using pbcopy. |
+| `--version` | Display version information. |
+| `--config` | Show current configuration (model, provider, settings). |
+| `--autofill-on` | Enable autofill for zsh or bash. This loads generated commands directly into your shell's edit buffer for review before execution. |
+| `--autofill-off` | Disable autofill and remove the shell function from your configuration. |
 
 ## 📚 Notes
 
@@ -105,9 +104,9 @@ Quco automatically maintains a history of all command generations in `~/.quco/hi
 
 Quco automatically creates backups of your shell configuration file (`~/.zshrc` or `~/.bashrc`) whenever it makes modifications during setup or autofill operations. The 3 most recent backups are kept as `~/.zshrc.quco-backup-<timestamp>`.
 
-## Screenshots
+## 📺 Demo
 
-![Quco AI](.readme/main.webp)
+<video src=".readme/demo.mp4" width="100%" style="border-radius: 30px;" controls loop muted poster=".readme/main.webp"></video>
 
 ## 👋🏻 Contact
 
