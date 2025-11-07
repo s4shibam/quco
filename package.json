@@ -1,6 +1,6 @@
 {
   "name": "quco",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Turn natural language into shell commands using AI",
   "repository": "s4shibam/quco-ai",
   "bin": {
