@@ -7,7 +7,8 @@ biome.json
 
 # Folders
 .github/
-.readme/
+.readme/*
+!.readme/logo.png
 .vscode/
 
 # Git

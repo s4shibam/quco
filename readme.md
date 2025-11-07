@@ -108,6 +108,8 @@ Quco automatically creates backups of your shell configuration file (`~/.zshrc` 
 
 <video src="https://github.com/user-attachments/assets/1d3da9e4-44d8-41d3-92da-373f2996bd69" controls muted poster=".readme/main.webp"></video>
 
+**[▶️ Watch Demo Video](https://github.com/user-attachments/assets/1d3da9e4-44d8-41d3-92da-373f2996bd69)** - See Quco in action converting natural language to shell commands
+
 ## 👋🏻 Contact
 
 [![Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/s4shibam)
