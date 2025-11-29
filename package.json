@@ -1,6 +1,6 @@
 {
   "name": "quco",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Turn natural language into shell commands using AI",
   "repository": "s4shibam/quco-ai",
   "bin": {
@@ -18,7 +18,7 @@
     "dev": "tsc --watch",
     "check": "biome check ./src",
     "fix": "biome check --write ./src",
-    "prepublishOnly": "npm run lint && npm run build",
+    "prepublishOnly": "npm i && npm run check && npm run build",
     "postinstall": "node scripts/postinstall.js || true"
   },
   "keywords": [
