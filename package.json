@@ -16,9 +16,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "biome check --write ./src",
-    "format": "biome format --write ./src",
     "check": "biome check ./src",
+    "fix": "biome check --write ./src",
     "prepublishOnly": "npm run lint && npm run build",
     "postinstall": "node scripts/postinstall.js || true"
   },
