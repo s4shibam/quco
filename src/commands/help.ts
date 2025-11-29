@@ -1,5 +1,7 @@
 import chalk from 'chalk'
+import { getShellRcPath } from '../config'
 import { VERSION } from '../constants'
+import { getSupportedModelProviders } from '../utils'
 
 export const showHelp = (): void => {
   console.log(chalk.hex('#f86d6d')(`\nQuco AI v${VERSION} - Quick Command AI\n`))
@@ -27,6 +29,26 @@ export const showHelp = (): void => {
       'quco --autofill-off'
     )}     Disable autofill (Commands will be copied to clipboard)\n`
   )
+
+  console.log(chalk.bold('Supported Model Providers:\n'))
+  console.log(
+    chalk.yellow(
+      getSupportedModelProviders()
+        .map((p) => `  - ${p}`)
+        .join('\n')
+    )
+  )
+  console.log()
+
+  console.log(chalk.bold('Using Other Model Names:\n'))
+  console.log('  Quco supports various model names from supported providers via Vercel AI SDK')
+  console.log('  To use a different model name, manually edit your shell configuration file:\n')
+  console.log(`    1. Go to your shell config: ${chalk.cyan(getShellRcPath())}`)
+  console.log(`    2. Update the model provider and model name in your shell config`)
+  console.log(
+    `       ${chalk.dim('Check https://ai-sdk.dev/docs/foundations/providers-and-models#ai-sdk-providers for model names')}`
+  )
+  console.log(`    3. Reload config: ${chalk.cyan(`source ${getShellRcPath()}`)}\n`)
 
   console.log(chalk.bold('Examples:\n'))
   console.log(`  ${chalk.dim('# Check IP address')}`)

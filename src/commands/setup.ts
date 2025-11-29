@@ -1,7 +1,7 @@
 import { password, select } from '@inquirer/prompts'
 import chalk from 'chalk'
 import { getCurrentShellType, getShellRcPath, writeConfigToRc } from '../config'
-import { SUPPORTED_MODELS } from '../constants'
+import { DEFAULT_MODELS } from '../constants'
 import type { TQucoConfig } from '../types'
 
 export const setupCommand = async (): Promise<void> => {
@@ -9,9 +9,9 @@ export const setupCommand = async (): Promise<void> => {
   console.log('This will configure quco to use an AI model for command generation.\n')
 
   // Ask for model selection
-  const modelChoices = SUPPORTED_MODELS.map((model) => ({
-    name: model.name,
-    value: model.id
+  const modelChoices = DEFAULT_MODELS.map((model) => ({
+    name: model.displayName,
+    value: `${model.modelProvider}/${model.modelName}`
   }))
 
   const selectedModel = await select({
@@ -19,7 +19,7 @@ export const setupCommand = async (): Promise<void> => {
     choices: modelChoices
   })
 
-  const model = SUPPORTED_MODELS.find((m) => m.id === selectedModel)
+  const model = DEFAULT_MODELS.find((m) => `${m.modelProvider}/${m.modelName}` === selectedModel)
   if (!model) {
     console.error(chalk.red('Error: Selected model not found'))
     process.exit(1)
@@ -27,7 +27,7 @@ export const setupCommand = async (): Promise<void> => {
 
   // Ask for API key
   const apiKey = await password({
-    message: `Enter your ${model.provider.toUpperCase()} API key:`,
+    message: `Enter your ${model.modelProvider.toUpperCase()} API key:`,
     mask: true,
     validate: (input: string) => {
       if (!input || input.trim().length === 0) {
@@ -38,7 +38,8 @@ export const setupCommand = async (): Promise<void> => {
   })
 
   const config: TQucoConfig = {
-    modelId: selectedModel,
+    modelProvider: model.modelProvider,
+    modelName: model.modelName,
     apiKey: apiKey.trim()
   }
 
@@ -62,6 +63,11 @@ export const setupCommand = async (): Promise<void> => {
       )
       console.log(chalk.dim(`   Run: ${chalk.bold('quco --autofill-on')}\n`))
     }
+
+    // Show information about using other models
+    console.log(chalk.dim('📚 Note: You can use other models from supported providers.'))
+    console.log(chalk.dim('   Run: quco (without arguments) for more information.'))
+    console.log()
   } catch (error) {
     console.error(chalk.red('\n✗ Failed to save configuration:'))
     console.error(chalk.red((error as Error).message))
