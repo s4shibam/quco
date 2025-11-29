@@ -1,12 +1,12 @@
 import chalk from 'chalk'
-import { getConfigFromEnv, validateModelId } from '../config'
+import { getConfigFromEnv } from '../config'
 import { generateCommand } from '../llm'
 import {
   copyToClipboard,
   formatError,
+  getSupportedModelProviders,
   isNetworkError,
-  isShellAutofillActive,
-  validateCommand
+  isShellAutofillActive
 } from '../utils'
 
 export const generateCommandFromPrompt = async ({ prompt }: { prompt: string }): Promise<void> => {
@@ -19,10 +19,20 @@ export const generateCommandFromPrompt = async ({ prompt }: { prompt: string }):
     process.exit(1)
   }
 
-  // Validate model ID
-  if (!validateModelId({ modelId: config.modelId })) {
-    console.error(chalk.red(`Error: Invalid model ID '${config.modelId}'.`))
-    console.error(chalk.yellow('Please run: quco --setup to reconfigure'))
+  // Validate model
+  if (!getSupportedModelProviders().includes(config.modelProvider)) {
+    console.error(
+      chalk.red(`Error: Quco is not configured to use model provider: ${config.modelProvider}.`)
+    )
+    console.error(chalk.yellow('Supported model providers:'))
+    console.error(
+      chalk.yellow(
+        getSupportedModelProviders()
+          .map((p) => `- ${p}`)
+          .join('\n')
+      )
+    )
+    console.error(chalk.yellow('Please run: quco --setup'))
     process.exit(1)
   }
 
@@ -30,20 +40,20 @@ export const generateCommandFromPrompt = async ({ prompt }: { prompt: string }):
     // Call LLM to generate command
     const response = await generateCommand({
       prompt,
-      modelId: config.modelId,
+      modelProvider: config.modelProvider,
+      modelName: config.modelName,
       apiKey: config.apiKey
     })
 
-    // Validate the generated command
-    const validation = validateCommand({ rawOutput: response.command })
-
-    if (!validation.valid || !validation.command) {
-      console.error(chalk.red(`Error: ${validation.error || 'Invalid command'}`))
+    // Validate the response
+    if (!response.valid) {
+      console.error(chalk.red('❌ Failed to generate command'))
+      console.error(chalk.yellow('Reason: ') + response.reasoning)
       process.exit(1)
     }
 
     // Output the validated command
-    await outputCommand({ command: validation.command })
+    await outputCommand({ command: response.command })
   } catch (error) {
     if (isNetworkError({ error })) {
       console.error(chalk.red('Error: Network request failed.'))
