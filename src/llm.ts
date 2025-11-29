@@ -3,57 +3,48 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import ora from 'ora'
-import { RETRY_PROMPT_REMINDER, SUPPORTED_MODELS, SYSTEM_PROMPT } from './constants'
+import { RETRY_PROMPT_REMINDER, SYSTEM_PROMPT } from './constants'
 import { addHistoryEntry } from './history'
-import type { TLLMResponse, TModelProvider } from './types'
-
-export const getModelProvider = ({ modelId }: { modelId: string }): TModelProvider => {
-  const model = SUPPORTED_MODELS.find((m) => m.id === modelId)
-  if (!model) {
-    throw new Error(`Unknown model: ${modelId}`)
-  }
-  return model.provider
-}
-
-export const getModelName = ({ modelId }: { modelId: string }): string => {
-  const model = SUPPORTED_MODELS.find((m) => m.id === modelId)
-  if (!model) {
-    throw new Error(`Unknown model: ${modelId}`)
-  }
-
-  // Extract model name by removing provider prefix (e.g., "openai/gpt-4" -> "gpt-4")
-  const firstSlashIndex = model.id.indexOf('/')
-  return firstSlashIndex !== -1 ? model.id.substring(firstSlashIndex + 1) : model.id
-}
+import type { TModelProvider, TValidationResult } from './types'
+import { getUserContext, validateLLMResponse } from './utils'
 
 export const generateCommand = async ({
   prompt,
-  modelId,
+  modelProvider,
+  modelName,
   apiKey,
   maxRetries = 2
 }: {
   prompt: string
-  modelId: string
+  modelProvider: TModelProvider
+  modelName: string
   apiKey: string
   maxRetries?: number
-}): Promise<TLLMResponse> => {
-  const provider = getModelProvider({ modelId })
-  const modelName = getModelName({ modelId })
-
+}): Promise<TValidationResult> => {
   const spinner = ora({ text: 'Generating command...' }).start()
 
   let lastError: Error | null = null
   let lastRawResponse: string | null = null
+  let lastValidation: TValidationResult | null = null
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      if (attempt > 0) {
-        spinner.text = `Retrying (${attempt + 1}/${maxRetries + 1})...`
-        spinner.color = 'gray'
+      if (attempt === 0) {
+        spinner.text = 'Generating command...'
+      } else if (attempt < maxRetries) {
+        spinner.text = `Retrying (${attempt}/${maxRetries})...`
+      } else {
+        spinner.text = 'Last try...'
       }
 
-      const sdk = createSDK({ provider, apiKey })
+      const sdk = createSDK({ provider: modelProvider, apiKey })
       const model = sdk(modelName)
+
+      // Get user context for better command generation
+      const userContext = getUserContext()
+
+      // Combine system prompt with user context
+      const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${userContext}`
 
       // Adjust prompt for retries
       const userPrompt = attempt === 0 ? prompt : `${prompt}\n\n${RETRY_PROMPT_REMINDER}`
@@ -63,7 +54,7 @@ export const generateCommand = async ({
         messages: [
           {
             role: 'system',
-            content: SYSTEM_PROMPT
+            content: enhancedSystemPrompt
           },
           {
             role: 'user',
@@ -71,31 +62,32 @@ export const generateCommand = async ({
           }
         ],
         temperature: 0.1,
-        maxOutputTokens: 500,
+        maxOutputTokens: 1024,
         abortSignal: AbortSignal.timeout(30000) // 30 seconds timeout
       })
 
       lastRawResponse = result.text
 
-      // Extract command from triple backticks
-      const backtickMatch = lastRawResponse.match(/```(?:\w+)?\s*\n?(.*?)\n?```/s)
-      const command = backtickMatch ? backtickMatch[1].trim() : lastRawResponse.trim()
+      const validation = validateLLMResponse({ rawResponse: lastRawResponse })
 
-      spinner.succeed('Command generated')
+      lastValidation = validation
+
+      if (!validation.valid || !validation.command) {
+        throw new Error(validation.reasoning || 'Invalid command')
+      }
+
+      const { command, reasoning } = validation
 
       // Log to history
       addHistoryEntry({
         prompt,
-        response: command,
-        status: 'success'
+        status: 'success',
+        response: lastRawResponse || 'No response from LLM'
       })
 
-      return { command }
+      return { valid: true, command, reasoning }
     } catch (error) {
       lastError = error as Error
-      if (attempt === maxRetries) {
-        break
-      }
 
       // Log error to history
       addHistoryEntry({
@@ -105,27 +97,29 @@ export const generateCommand = async ({
         error: lastError || 'Unknown error'
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      if (attempt === maxRetries) {
+        return { valid: false, reasoning: lastValidation?.reasoning || 'No reasoning available' }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 512))
+    } finally {
+      spinner.stop()
     }
   }
 
+  // This should never be reached, but TypeScript needs it
   spinner.fail('Failed to generate command')
-
-  throw new Error(
-    `Failed to generate command after ${maxRetries + 1} attempts: ${
-      lastError?.message || 'Unknown error'
-    }`
-  )
+  return { valid: false, reasoning: 'Unexpected error: loop completed without return' }
 }
 
 const createSDK = ({ provider, apiKey }: { provider: TModelProvider; apiKey: string }) => {
   switch (provider) {
-    case 'openai':
-      return createOpenAI({ apiKey })
     case 'anthropic':
       return createAnthropic({ apiKey })
     case 'google':
       return createGoogleGenerativeAI({ apiKey })
+    case 'openai':
+      return createOpenAI({ apiKey })
     default:
       throw new Error(`Unsupported provider: ${provider}`)
   }

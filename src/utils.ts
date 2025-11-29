@@ -1,11 +1,58 @@
 import { exec } from 'node:child_process'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import { promisify } from 'node:util'
-import { DESTRUCTIVE_PATTERNS, MAX_SHELL_CONFIG_BACKUPS } from './constants'
+import { DEFAULT_MODELS, MAX_SHELL_CONFIG_BACKUPS } from './constants'
 import type { TValidationResult } from './types'
 
 const execAsync = promisify(exec)
+
+/**
+ * Returns the supported model providers
+ */
+export const getSupportedModelProviders = (): string[] => {
+  return [...new Set(DEFAULT_MODELS.map((m) => m.modelProvider))]
+}
+
+/**
+ * Generates user context information to be included in the prompt
+ * This helps the AI generate more accurate and context-aware commands
+ */
+export const getUserContext = (): string => {
+  // Get current date in readable format
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
+  // Get OS information
+  const platform = os.platform()
+  const osType = os.type()
+  const osRelease = os.release()
+  const osInfo = `${osType} ${osRelease} (${platform})`
+
+  // Get shell information from environment
+  const shell = process.env.SHELL || 'unknown'
+
+  // Get current working directory (workspace path)
+  const workspacePath = process.cwd()
+
+  // Get user's home directory
+  const homeDir = os.homedir()
+
+  return `## USER CONTEXT
+- Current Date: ${currentDate}
+- Operating System: ${osInfo}
+- Shell: ${shell}
+- Current Working Directory: ${workspacePath}
+- Home Directory: ${homeDir}
+- Architecture: ${os.arch()}
+
+Use this context to generate commands that are appropriate for the user's environment.`
+}
 
 export const copyToClipboard = async ({ text }: { text: string }): Promise<boolean> => {
   try {
@@ -87,81 +134,76 @@ export const cleanupOldBackups = ({ rcPath }: { rcPath: string }): void => {
   }
 }
 
-export const validateCommand = ({ rawOutput }: { rawOutput: string }): TValidationResult => {
-  // Step 1: Trim whitespace
-  const trimmed = rawOutput.trim()
+export const validateLLMResponse = ({
+  rawResponse
+}: {
+  rawResponse: string
+}): TValidationResult => {
+  const backtickMatch = rawResponse.match(/```(?:\w+)?\s*\n?(.*?)\n?```/s)
+  const jsonString = backtickMatch ? backtickMatch[1].trim() : rawResponse.trim()
 
-  if (!trimmed) {
-    return {
-      valid: false,
-      error: 'LLM returned empty output'
-    }
-  }
+  let parsedResponse: { reasoning: string; command: string }
 
-  // Step 2: Check for multiple lines
-  const lines = trimmed.split('\n').filter((line) => line.trim().length > 0)
-  if (lines.length > 1) {
-    return {
-      valid: false,
-      error: 'LLM returned multiple lines. Expected exactly one command.'
-    }
-  }
+  try {
+    parsedResponse = JSON.parse(jsonString)
 
-  const command = lines[0].trim()
-
-  // Step 3: Remove any markdown code block formatting if present
-  const cleanCommand = command
-  if (cleanCommand.startsWith('```') || cleanCommand.startsWith('`')) {
-    return {
-      valid: false,
-      error: 'LLM returned command with markdown formatting. Expected plain command.'
-    }
-  }
-
-  // Step 4: Check against destructive patterns
-  for (const pattern of DESTRUCTIVE_PATTERNS) {
-    if (pattern.test(cleanCommand)) {
+    // Validate JSON structure
+    if (
+      typeof parsedResponse.reasoning !== 'string' ||
+      typeof parsedResponse.command !== 'string'
+    ) {
       return {
         valid: false,
-        error: 'Command matches destructive pattern and is not allowed for safety reasons'
+        reasoning: 'Invalid JSON structure: missing reasoning or command fields'
       }
+    }
+  } catch (parseError) {
+    return {
+      valid: false,
+      reasoning: `Failed to parse LLM response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`
     }
   }
 
-  // Step 5: Basic sanity checks
-  if (cleanCommand.includes('\0')) {
+  const { reasoning, command } = parsedResponse
+
+  // Trim whitespace
+  const trimmedCommand = command?.trim()
+
+  // Check if command is empty or missing
+  if (!trimmedCommand || trimmedCommand === '') {
     return {
       valid: false,
-      error: 'Command contains null bytes'
+      reasoning: 'Unable to generate command'
+    }
+  }
+
+  // Basic sanity checks
+  if (trimmedCommand.includes('\0')) {
+    return {
+      valid: false,
+      reasoning: 'Command contains null bytes'
     }
   }
 
   // Check for commands starting with invalid characters
-  if (/^[|&;<>]/.test(cleanCommand)) {
+  if (/^[|&;<>]/.test(trimmedCommand)) {
     return {
       valid: false,
-      error: 'Command cannot start with pipe, redirect, or control operators'
+      reasoning: 'Command cannot start with pipe, redirect, or control operators'
     }
   }
 
-  // Check for suspicious sudo patterns (only highly dangerous combinations)
-  // Allow legitimate sudo usage but block dangerous patterns like sudo rm -rf
-  if (cleanCommand.match(/sudo\s+rm\s+-[rf]+.*\//)) {
+  // Check for shell prompt symbols at start
+  if (/^[$#>]\s/.test(trimmedCommand)) {
     return {
       valid: false,
-      error: 'Command contains dangerous sudo rm combination'
-    }
-  }
-
-  if (cleanCommand.match(/sudo\s+(mkfs|dd|fdisk|parted)/)) {
-    return {
-      valid: false,
-      error: 'Command contains dangerous sudo disk operation'
+      reasoning: 'Command should not start with shell prompt symbols ($, #, >)'
     }
   }
 
   return {
     valid: true,
-    command: cleanCommand
+    command: trimmedCommand,
+    reasoning
   }
 }
