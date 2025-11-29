@@ -1,8 +1,8 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { CONFIG_COMMENT_END, CONFIG_COMMENT_START, SUPPORTED_MODELS } from './constants'
-import type { TQucoConfig, TShellType } from './types'
+import { CONFIG_COMMENT_END, CONFIG_COMMENT_START, DEFAULT_MODELS } from './constants'
+import type { TModelProvider, TQucoConfig, TShellType } from './types'
 import { cleanupOldBackups } from './utils'
 
 export const getShellRcPath = (): string => {
@@ -27,21 +27,30 @@ export const getCurrentShellType = (): TShellType => {
 }
 
 export const getConfigFromEnv = (): TQucoConfig | null => {
-  const modelId = process.env.QUCO_MODEL_ID
   const apiKey = process.env.QUCO_API_KEY
 
-  if (!modelId || !apiKey) {
+  if (!apiKey) {
+    return null
+  }
+
+  const modelProvider = process.env.QUCO_MODEL_PROVIDER as TModelProvider
+  const modelName = process.env.QUCO_MODEL_NAME as string
+
+  if (!modelProvider || !modelName) {
+    return null
+  }
+
+  // Validate that the provider is supported
+  const validProviders = DEFAULT_MODELS.map((m) => m.modelProvider)
+  if (!validProviders.includes(modelProvider)) {
     return null
   }
 
   return {
-    modelId,
+    modelProvider,
+    modelName,
     apiKey
   }
-}
-
-export const validateModelId = ({ modelId }: { modelId: string }): boolean => {
-  return SUPPORTED_MODELS.some((m) => m.id === modelId)
 }
 
 const removeAllConfigBlocks = (content: string, startMarker: string, endMarker: string): string => {
@@ -105,7 +114,8 @@ export const writeConfigToRc = ({ config }: { config: TQucoConfig }): void => {
   // Create new config block
   const configBlock = `
 ${CONFIG_COMMENT_START}
-export QUCO_MODEL_ID="${config.modelId}"
+export QUCO_MODEL_PROVIDER="${config.modelProvider}"
+export QUCO_MODEL_NAME="${config.modelName}"
 export QUCO_API_KEY="${config.apiKey}"
 ${CONFIG_COMMENT_END}
 `
