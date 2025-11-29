@@ -57,8 +57,8 @@ export const addHistoryEntry = ({
     const entry: THistoryEntry = {
       timestamp: new Date().toISOString(),
       prompt,
-      response,
       status,
+      response,
       error
     }
     entries.unshift(entry) // Add new entry at the beginning (top)
