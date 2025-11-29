@@ -31,6 +31,7 @@
     "llm",
     "openai",
     "anthropic",
+    "google",
     "gemini"
   ],
   "author": "s4shibam",
